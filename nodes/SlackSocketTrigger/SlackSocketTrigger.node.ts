@@ -24,9 +24,10 @@ let subscibers: {
 }[] = [];
 
 class SlackSocketConnectors {
-	static apps: (App & {
+	static apps: {
+		stop: () => Promise<void>;
 		botToken: string;
-	})[] = [];
+	}[] = [];
 
 	static async start(credentials: SlackCredential) {
 		if (this.apps.find((app) => app.botToken === credentials.botToken)) {
@@ -41,9 +42,11 @@ class SlackSocketConnectors {
 		});
 
 		this.apps.push({
-			...app,
+			stop: async () => {
+				await app.stop();
+			},
 			botToken: credentials.botToken,
-		} as App & { botToken: string });
+		});
 
 		app.event('message', async ({ body, payload, context, event }) => {
 			if (event.subtype === 'bot_message') {
@@ -63,17 +66,11 @@ class SlackSocketConnectors {
 	}
 
 	static async stop(botToken: string) {
-		const subscibersWithBotToken = subscibers.filter(
-			(subscriber) => subscriber.botToken === botToken,
-		);
+		const app = this.apps.find((app) => app.botToken === botToken);
 
-		if (subscibersWithBotToken.length === 0) {
-			const app = this.apps.find((app) => app.botToken === botToken);
-			if (app) {
-				await app.stop();
-
-				this.apps = this.apps.filter((app) => app.botToken !== botToken);
-			}
+		if (app) {
+			await app.stop();
+			this.apps = this.apps.filter((app) => app.botToken !== botToken);
 		}
 	}
 }
@@ -158,8 +155,6 @@ export class SlackSocketTrigger implements INodeType {
 			value: string;
 		};
 
-		credentials.botToken;
-
 		const channelId = channelToWatch.value;
 
 		if (!subscibers.some((subscriber) => subscriber.nodeId === this.getNode().id)) {
@@ -204,12 +199,17 @@ export class SlackSocketTrigger implements INodeType {
 			}
 		}
 
-		console.log('subscibers', subscibers);
-
 		return {
 			manualTriggerFunction,
 			closeFunction: async () => {
 				subscibers = subscibers.filter((subscriber) => subscriber.nodeId !== this.getNode().id);
+				const subscibersBotTokens = subscibers.map((subscriber) => subscriber.botToken);
+
+				for (const app of SlackSocketConnectors.apps) {
+					if (!subscibersBotTokens.includes(app.botToken)) {
+						await SlackSocketConnectors.stop(app.botToken);
+					}
+				}
 			},
 		};
 	}
