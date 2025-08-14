@@ -67,6 +67,8 @@ class SlackSocketConnectors {
 			const app = this.apps.find((app) => app.botToken === credentials.botToken);
 			if (app) {
 				await app.stop();
+
+				this.apps = this.apps.filter((app) => app.botToken !== credentials.botToken);
 			}
 		}
 	}
