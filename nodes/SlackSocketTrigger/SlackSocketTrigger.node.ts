@@ -1,5 +1,7 @@
 import {
 	IDataObject,
+	ILoadOptionsFunctions,
+	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
 	ITriggerFunctions,
@@ -8,20 +10,23 @@ import {
 } from 'n8n-workflow';
 import { App } from '@slack/bolt';
 
-interface SlackCredential {
+type SlackCredential = {
 	botToken: string;
 	appToken: string;
 	signingSecret: string;
-}
+};
 
-let subscibers: {
+interface Subscriber {
 	trigger: string[];
-	channelToWatch: string;
+	channelsToWatch: string[];
+	messageFilter?: string;
 	nodeId: string;
 	workflowId?: string;
 	botToken: string;
 	emit: (data: IDataObject) => void;
-}[] = [];
+}
+
+let subscribers: Subscriber[] = [];
 
 class SlackSocketConnectors {
 	static apps: {
@@ -48,18 +53,86 @@ class SlackSocketConnectors {
 			botToken: credentials.botToken,
 		});
 
+		// Handle message events
 		app.event('message', async ({ body, payload, context, event }) => {
-			if (event.subtype === 'bot_message') {
-				return Promise.resolve();
-			}
-
-			subscibers.forEach((subscriber) => {
-				if (subscriber.trigger.includes('message') && subscriber.channelToWatch === event.channel) {
-					subscriber.emit({ body, payload, context, event });
+			try {
+				// Skip bot messages and message updates
+				if (event.subtype === 'bot_message' || event.subtype === 'message_changed') {
+					return;
 				}
-			});
 
-			return Promise.resolve();
+				subscribers.forEach((subscriber) => {
+					if (
+						subscriber.trigger.includes('message') &&
+						(subscriber.channelsToWatch.includes(event.channel) ||
+							subscriber.channelsToWatch.length === 0)
+					) {
+						// Apply message filter if specified
+						if (subscriber.messageFilter && subscriber.messageFilter.trim() !== '') {
+							try {
+								const regex = new RegExp(subscriber.messageFilter, 'i');
+								const messageText = (event as any).text || '';
+								if (!regex.test(messageText)) {
+									return; // Skip if message doesn't match filter
+								}
+							} catch (regexError) {
+								console.error('Invalid regex pattern in message filter:', regexError);
+								return; // Skip if regex is invalid
+							}
+						}
+
+						try {
+							subscriber.emit({ body, payload, context, event });
+						} catch (error) {
+							console.error('Error emitting event to subscriber:', error);
+						}
+					}
+				});
+			} catch (error) {
+				console.error('Error handling Slack message event:', error);
+			}
+		});
+
+		// Handle app mention events
+		app.event('app_mention', async ({ body, payload, context, event }) => {
+			try {
+				subscribers.forEach((subscriber) => {
+					if (
+						subscriber.trigger.includes('app_mention') &&
+						(subscriber.channelsToWatch.includes(event.channel) ||
+							subscriber.channelsToWatch.length === 0)
+					) {
+						try {
+							subscriber.emit({ body, payload, context, event });
+						} catch (error) {
+							console.error('Error emitting app_mention event to subscriber:', error);
+						}
+					}
+				});
+			} catch (error) {
+				console.error('Error handling Slack app_mention event:', error);
+			}
+		});
+
+		// Handle reaction added events
+		app.event('reaction_added', async ({ body, payload, context, event }) => {
+			try {
+				subscribers.forEach((subscriber) => {
+					if (
+						subscriber.trigger.includes('reaction_added') &&
+						(subscriber.channelsToWatch.includes(event.item.channel) ||
+							subscriber.channelsToWatch.length === 0)
+					) {
+						try {
+							subscriber.emit({ body, payload, context, event });
+						} catch (error) {
+							console.error('Error emitting reaction_added event to subscriber:', error);
+						}
+					}
+				});
+			} catch (error) {
+				console.error('Error handling Slack reaction_added event:', error);
+			}
 		});
 
 		await app.start();
@@ -76,6 +149,38 @@ class SlackSocketConnectors {
 }
 
 export class SlackSocketTrigger implements INodeType {
+	methods = {
+		loadOptions: {
+			getChannels: async function (this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				try {
+					const credentials = (await this.getCredentials(
+						'slackSocketCredentialsApi',
+					)) as SlackCredential;
+					const app = new App({
+						token: credentials.botToken,
+						signingSecret: credentials.signingSecret,
+						appToken: credentials.appToken,
+						socketMode: false, // Just for API calls
+					});
+
+					const result = await app.client.conversations.list({
+						types: 'public_channel,private_channel',
+						limit: 200,
+					});
+
+					const channels = result.channels || [];
+					return channels.map((channel: any) => ({
+						name: `#${channel.name}`,
+						value: channel.id,
+					}));
+				} catch (error) {
+					this.logger.error('Error fetching channels:', error);
+					return [];
+				}
+			},
+		},
+	};
+
 	description: INodeTypeDescription = {
 		displayName: 'Slack Socket Mode Trigger',
 		name: 'slackSocketTrigger',
@@ -105,44 +210,45 @@ export class SlackSocketTrigger implements INodeType {
 						value: 'message',
 						description: 'When a message was sent to a channel',
 					},
+					{
+						name: 'App Mention',
+						value: 'app_mention',
+						description: 'When the app is mentioned in a message',
+					},
+					{
+						name: 'Reaction Added',
+						value: 'reaction_added',
+						description: 'When a reaction is added to a message',
+					},
 				],
-				default: [],
+				default: ['message'],
+				required: true,
 			},
 			{
-				displayName: 'Channel to Watch',
-				name: 'channelToWatch',
-				type: 'resourceLocator',
-				default: { mode: 'list', value: '' },
-				placeholder: 'Select a channel',
+				displayName: 'Channels to Watch',
+				name: 'channelsToWatch',
+				type: 'multiOptions',
+				default: [],
+				placeholder: 'Select channels',
 				description:
-					'Select a channel to filter events. If specified, only events from this channel will trigger the workflow.',
-				modes: [
-					{
-						displayName: 'From List',
-						name: 'list',
-						type: 'list',
-						placeholder: 'Select a channel',
-						typeOptions: {
-							searchListMethod: 'channelSearch',
-							searchable: true,
-						},
+					'Select channels to filter events. If none specified, events from all channels will trigger the workflow.',
+				typeOptions: {
+					loadOptionsMethod: 'getChannels',
+				},
+			},
+			{
+				displayName: 'Message Filter (Optional)',
+				name: 'messageFilter',
+				type: 'string',
+				default: '',
+				placeholder: 'Enter regex pattern or leave empty for all messages',
+				description:
+					'Optional regex pattern to filter messages. Only messages matching this pattern will trigger the workflow.',
+				displayOptions: {
+					show: {
+						trigger: ['message'],
 					},
-					{
-						displayName: 'By ID',
-						name: 'id',
-						type: 'string',
-						placeholder: 'C1234567890',
-						validation: [
-							{
-								type: 'regex',
-								properties: {
-									regex: '^[C|G|D][A-Z0-9]{8,}$',
-									errorMessage: 'Not a valid Slack channel ID',
-								},
-							},
-						],
-					},
-				],
+				},
 			},
 		],
 	};
@@ -150,28 +256,35 @@ export class SlackSocketTrigger implements INodeType {
 	async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
 		const credentials = (await this.getCredentials('slackSocketCredentialsApi')) as SlackCredential;
 		const trigger = this.getNodeParameter('trigger', []) as string[];
-		const channelToWatch = this.getNodeParameter('channelToWatch') as {
-			mode: string;
-			value: string;
-		};
+		const channelsToWatch = this.getNodeParameter('channelsToWatch', []) as string[];
+		const messageFilter = this.getNodeParameter('messageFilter', '') as string;
 
-		const channelId = channelToWatch.value;
+		// Validate trigger array
+		if (!trigger || trigger.length === 0) {
+			throw new Error('At least one trigger event must be selected');
+		}
 
-		if (!subscibers.some((subscriber) => subscriber.nodeId === this.getNode().id)) {
-			subscibers.push({
+		if (!subscribers.some((subscriber) => subscriber.nodeId === this.getNode().id)) {
+			subscribers.push({
 				workflowId: this.getWorkflow().id,
 				nodeId: this.getNode().id,
 				trigger,
-				channelToWatch: channelId,
+				channelsToWatch,
+				messageFilter: messageFilter,
 				botToken: credentials.botToken,
 				emit: (data) => this.emit([this.helpers.returnJsonArray(data)]),
 			});
 		}
 
+		// Clean up unused apps
 		for (const app of SlackSocketConnectors.apps) {
-			const activeBotTokens = subscibers.map((subscriber) => subscriber.botToken);
+			const activeBotTokens = subscribers.map((subscriber) => subscriber.botToken);
 			if (!activeBotTokens.includes(app.botToken)) {
-				await SlackSocketConnectors.stop(app.botToken);
+				try {
+					await SlackSocketConnectors.stop(app.botToken);
+				} catch (error) {
+					this.logger.error(`Error stopping unused Slack app: ${error}`);
+				}
 			}
 		}
 
@@ -202,12 +315,16 @@ export class SlackSocketTrigger implements INodeType {
 		return {
 			manualTriggerFunction,
 			closeFunction: async () => {
-				subscibers = subscibers.filter((subscriber) => subscriber.nodeId !== this.getNode().id);
-				const subscibersBotTokens = subscibers.map((subscriber) => subscriber.botToken);
+				subscribers = subscribers.filter((subscriber) => subscriber.nodeId !== this.getNode().id);
+				const subscribersBotTokens = subscribers.map((subscriber) => subscriber.botToken);
 
 				for (const app of SlackSocketConnectors.apps) {
-					if (!subscibersBotTokens.includes(app.botToken)) {
-						await SlackSocketConnectors.stop(app.botToken);
+					if (!subscribersBotTokens.includes(app.botToken)) {
+						try {
+							await SlackSocketConnectors.stop(app.botToken);
+						} catch (error) {
+							this.logger.error('Error stopping Slack app during cleanup:', error);
+						}
 					}
 				}
 			},
