@@ -6,7 +6,6 @@ import {
 	INodeTypeDescription,
 	ITriggerFunctions,
 	ITriggerResponse,
-	NodeConnectionType,
 } from 'n8n-workflow';
 import { App } from '@slack/bolt';
 
@@ -174,7 +173,7 @@ export class SlackSocketTrigger implements INodeType {
 		},
 		icon: 'file:./assets/slack-socket-mode.svg',
 		inputs: [],
-		outputs: [NodeConnectionType.Main],
+		outputs: ['main'],
 		credentials: [
 			{
 				name: 'slackSocketCredentialsApi',
@@ -213,7 +212,7 @@ export class SlackSocketTrigger implements INodeType {
 				default: [],
 				placeholder: 'Select channels',
 				description:
-					'Select channels to filter events. If none specified, events from all channels will trigger the workflow.',
+				'Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 				typeOptions: {
 					loadOptionsMethod: 'getChannels',
 				},
@@ -256,6 +255,7 @@ export class SlackSocketTrigger implements INodeType {
 		const allowBotMessages = this.getNodeParameter('allowBotMessages', false) as boolean;
 
 		if (!trigger || trigger.length === 0) {
+			// eslint-disable-next-line n8n-nodes-base/node-execute-block-wrong-error-thrown
 			throw new Error('At least one trigger event must be selected');
 		}
 
