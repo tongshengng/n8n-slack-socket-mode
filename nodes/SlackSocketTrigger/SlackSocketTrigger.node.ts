@@ -28,7 +28,6 @@ class SlackSocketConnectors {
 	})[] = [];
 
 	static async start(credentials: SlackCredential) {
-		credentials.botToken;
 		if (this.apps.find((app) => app.botToken === credentials.botToken)) {
 			return Promise.resolve();
 		}
@@ -40,7 +39,10 @@ class SlackSocketConnectors {
 			socketMode: true,
 		});
 
-		this.apps.push(app as App & { botToken: string });
+		this.apps.push({
+			...app,
+			botToken: credentials.botToken,
+		} as App & { botToken: string });
 
 		app.event('message', async ({ body, payload, context, event }) => {
 			if (event.subtype === 'bot_message') {
