@@ -20,6 +20,7 @@ interface Subscriber {
 	trigger: string[];
 	channelsToWatch: string[];
 	messageFilter?: string;
+	allowBotMessages?: boolean;
 	nodeId: string;
 	workflowId?: string;
 	botToken: string;
@@ -53,22 +54,40 @@ class SlackSocketConnectors {
 			botToken: credentials.botToken,
 		});
 
-		// Handle message events
-		app.event('message', async ({ body, payload, context, event }) => {
-			try {
-				// Skip bot messages and message updates
-				if (event.subtype === 'bot_message' || event.subtype === 'message_changed') {
-					return;
-				}
+		// Generic event handler function
+		const handleSlackEvent = (eventType: string) => {
+			return async ({ body, payload, context, event }: any) => {
+				try {
+					subscribers.forEach((subscriber) => {
+						// Skip bot messages and message updates for message events (unless allowed)
+						if (
+							eventType === 'message' &&
+							!subscriber.allowBotMessages &&
+							(event.subtype === 'bot_message' || event.subtype === 'message_changed')
+						) {
+							return;
+						}
+						if (!subscriber.trigger.includes(eventType)) {
+							return;
+						}
 
-				subscribers.forEach((subscriber) => {
-					if (
-						subscriber.trigger.includes('message') &&
-						(subscriber.channelsToWatch.includes(event.channel) ||
-							subscriber.channelsToWatch.length === 0)
-					) {
-						// Apply message filter if specified
-						if (subscriber.messageFilter && subscriber.messageFilter.trim() !== '') {
+						// Get the channel ID based on event type
+						const channelId = eventType === 'reaction_added' ? event.item.channel : event.channel;
+
+						// Check if channel should be watched
+						if (
+							subscriber.channelsToWatch.length > 0 &&
+							!subscriber.channelsToWatch.includes(channelId)
+						) {
+							return;
+						}
+
+						// Apply message filter for message events
+						if (
+							eventType === 'message' &&
+							subscriber.messageFilter &&
+							subscriber.messageFilter.trim() !== ''
+						) {
 							try {
 								const regex = new RegExp(subscriber.messageFilter, 'i');
 								const messageText = (event as any).text || '';
@@ -84,56 +103,19 @@ class SlackSocketConnectors {
 						try {
 							subscriber.emit({ body, payload, context, event });
 						} catch (error) {
-							console.error('Error emitting event to subscriber:', error);
+							console.error(`Error emitting ${eventType} event to subscriber:`, error);
 						}
-					}
-				});
-			} catch (error) {
-				console.error('Error handling Slack message event:', error);
-			}
-		});
+					});
+				} catch (error) {
+					console.error(`Error handling Slack ${eventType} event:`, error);
+				}
+			};
+		};
 
-		// Handle app mention events
-		app.event('app_mention', async ({ body, payload, context, event }) => {
-			try {
-				subscribers.forEach((subscriber) => {
-					if (
-						subscriber.trigger.includes('app_mention') &&
-						(subscriber.channelsToWatch.includes(event.channel) ||
-							subscriber.channelsToWatch.length === 0)
-					) {
-						try {
-							subscriber.emit({ body, payload, context, event });
-						} catch (error) {
-							console.error('Error emitting app_mention event to subscriber:', error);
-						}
-					}
-				});
-			} catch (error) {
-				console.error('Error handling Slack app_mention event:', error);
-			}
-		});
-
-		// Handle reaction added events
-		app.event('reaction_added', async ({ body, payload, context, event }) => {
-			try {
-				subscribers.forEach((subscriber) => {
-					if (
-						subscriber.trigger.includes('reaction_added') &&
-						(subscriber.channelsToWatch.includes(event.item.channel) ||
-							subscriber.channelsToWatch.length === 0)
-					) {
-						try {
-							subscriber.emit({ body, payload, context, event });
-						} catch (error) {
-							console.error('Error emitting reaction_added event to subscriber:', error);
-						}
-					}
-				});
-			} catch (error) {
-				console.error('Error handling Slack reaction_added event:', error);
-			}
-		});
+		// Register event handlers
+		app.event('message', handleSlackEvent('message'));
+		app.event('app_mention', handleSlackEvent('app_mention'));
+		app.event('reaction_added', handleSlackEvent('reaction_added'));
 
 		await app.start();
 	}
@@ -250,6 +232,19 @@ export class SlackSocketTrigger implements INodeType {
 					},
 				},
 			},
+			{
+				displayName: 'Allow Bot Messages',
+				name: 'allowBotMessages',
+				type: 'boolean',
+				default: false,
+				description:
+					'Whether to include messages from bots. By default, bot messages and message updates are filtered out.',
+				displayOptions: {
+					show: {
+						trigger: ['message'],
+					},
+				},
+			},
 		],
 	};
 
@@ -258,6 +253,7 @@ export class SlackSocketTrigger implements INodeType {
 		const trigger = this.getNodeParameter('trigger', []) as string[];
 		const channelsToWatch = this.getNodeParameter('channelsToWatch', []) as string[];
 		const messageFilter = this.getNodeParameter('messageFilter', '') as string;
+		const allowBotMessages = this.getNodeParameter('allowBotMessages', false) as boolean;
 
 		// Validate trigger array
 		if (!trigger || trigger.length === 0) {
@@ -271,6 +267,7 @@ export class SlackSocketTrigger implements INodeType {
 				trigger,
 				channelsToWatch,
 				messageFilter: messageFilter,
+				allowBotMessages: allowBotMessages,
 				botToken: credentials.botToken,
 				emit: (data) => this.emit([this.helpers.returnJsonArray(data)]),
 			});
