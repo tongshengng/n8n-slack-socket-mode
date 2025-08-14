@@ -14,10 +14,11 @@ interface SlackCredential {
 	signingSecret: string;
 }
 
-const subscibers: {
+let subscibers: {
 	trigger: string[];
 	channelToWatch: string;
-	workflowId: string;
+	nodeId: string;
+	workflowId?: string;
 	botToken: string;
 	emit: (data: IDataObject) => void;
 }[] = [];
@@ -61,16 +62,17 @@ class SlackSocketConnectors {
 		await app.start();
 	}
 
-	static async stop(credentials: SlackCredential) {
+	static async stop(botToken: string) {
 		const subscibersWithBotToken = subscibers.filter(
-			(subscriber) => subscriber.botToken === credentials.botToken,
+			(subscriber) => subscriber.botToken === botToken,
 		);
+
 		if (subscibersWithBotToken.length === 0) {
-			const app = this.apps.find((app) => app.botToken === credentials.botToken);
+			const app = this.apps.find((app) => app.botToken === botToken);
 			if (app) {
 				await app.stop();
 
-				this.apps = this.apps.filter((app) => app.botToken !== credentials.botToken);
+				this.apps = this.apps.filter((app) => app.botToken !== botToken);
 			}
 		}
 	}
@@ -160,13 +162,23 @@ export class SlackSocketTrigger implements INodeType {
 
 		const channelId = channelToWatch.value;
 
-		subscibers.push({
-			workflowId: this.getNode().id,
-			trigger,
-			channelToWatch: channelId,
-			botToken: credentials.botToken,
-			emit: (data) => this.emit([this.helpers.returnJsonArray(data)]),
-		});
+		if (!subscibers.some((subscriber) => subscriber.nodeId === this.getNode().id)) {
+			subscibers.push({
+				workflowId: this.getWorkflow().id,
+				nodeId: this.getNode().id,
+				trigger,
+				channelToWatch: channelId,
+				botToken: credentials.botToken,
+				emit: (data) => this.emit([this.helpers.returnJsonArray(data)]),
+			});
+		}
+
+		for (const app of SlackSocketConnectors.apps) {
+			const activeBotTokens = subscibers.map((subscriber) => subscriber.botToken);
+			if (!activeBotTokens.includes(app.botToken)) {
+				await SlackSocketConnectors.stop(app.botToken);
+			}
+		}
 
 		const manualTriggerFunction = async () => {
 			try {
@@ -192,16 +204,12 @@ export class SlackSocketTrigger implements INodeType {
 			}
 		}
 
+		console.log('subscibers', subscibers);
+
 		return {
 			manualTriggerFunction,
 			closeFunction: async () => {
-				subscibers.forEach((subscriber) => {
-					if (subscriber.workflowId === this.getNode().id) {
-						subscibers.splice(subscibers.indexOf(subscriber), 1);
-					}
-				});
-
-				await SlackSocketConnectors.stop(credentials);
+				subscibers = subscibers.filter((subscriber) => subscriber.nodeId !== this.getNode().id);
 			},
 		};
 	}
