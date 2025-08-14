@@ -56,7 +56,12 @@ Once the container is running, you can access n8n at:
 
 ## Using the Custom Node
 
-The custom Slack Socket Trigger node will be available in n8n's node palette once you login.
+The custom Slack Socket Trigger node will be available in n8n's node palette once you login. The node supports:
+
+- **Message events** with optional bot message filtering and regex pattern matching
+- **App mention events** when your bot is mentioned
+- **Reaction added events** when emojis are added to messages
+- **Channel-specific filtering** for all event types
 
 ## Troubleshooting
 
@@ -67,4 +72,4 @@ If you don't see the custom node in n8n:
 4. Restart the Docker container:
    ```bash
    docker compose restart
-   ``` 
+   ```

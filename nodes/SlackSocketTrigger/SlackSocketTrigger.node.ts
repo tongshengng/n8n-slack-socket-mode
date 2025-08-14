@@ -255,7 +255,6 @@ export class SlackSocketTrigger implements INodeType {
 		const messageFilter = this.getNodeParameter('messageFilter', '') as string;
 		const allowBotMessages = this.getNodeParameter('allowBotMessages', false) as boolean;
 
-		// Validate trigger array
 		if (!trigger || trigger.length === 0) {
 			throw new Error('At least one trigger event must be selected');
 		}
@@ -273,7 +272,6 @@ export class SlackSocketTrigger implements INodeType {
 			});
 		}
 
-		// Clean up unused apps
 		for (const app of SlackSocketConnectors.apps) {
 			const activeBotTokens = subscribers.map((subscriber) => subscriber.botToken);
 			if (!activeBotTokens.includes(app.botToken)) {
