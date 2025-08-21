@@ -21,7 +21,7 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "rm -rf dist && tsc && cp -r nodes/SlackSocketTrigger/assets dist/nodes/SlackSocketTrigger/ && cp -r credentials/assets dist/credentials/",
+		"build": "rm -rf dist && tsc && cp -r nodes/SlackSocketModeTrigger/assets dist/nodes/SlackSocketModeTrigger/ && cp -r credentials/assets dist/credentials/",
 		"dev": "tsc --watch",
 		"format": "biome format --write nodes credentials package.json",
 		"lint": "biome lint nodes credentials package.json",

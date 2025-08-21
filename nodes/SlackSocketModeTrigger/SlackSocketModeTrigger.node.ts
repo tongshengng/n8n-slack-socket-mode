@@ -268,7 +268,7 @@ namespace SlackSocketConnectionManager {
 	}
 }
 
-export class SlackSocketTrigger implements INodeType {
+export class SlackSocketModeTrigger implements INodeType {
 	methods = {
 		loadOptions: {
 			getChannels: async function (this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
@@ -304,7 +304,7 @@ export class SlackSocketTrigger implements INodeType {
 
 	description: INodeTypeDescription = {
 		displayName: 'Slack Socket Mode Trigger',
-		name: 'slackSocketTrigger',
+		name: 'slackSocketModeTrigger',
 		group: ['trigger'],
 		version: 1,
 		description: 'Triggers workflow when a Slack message matches a regex pattern via Socket Mode',
@@ -418,9 +418,9 @@ export class SlackSocketTrigger implements INodeType {
 		const manualTriggerFunction = async () => {
 			try {
 				await SlackSocketConnectionManager.startSlackSocketConnection(credentials);
-				this.logger.info('Started Slack Socket app in test mode');
+				this.logger.info('Started Slack Socket Mode app in test mode');
 			} catch (error) {
-				this.logger.error(`Error starting Slack Socket app in test mode: ${error}`);
+				this.logger.error(`Error starting Slack Socket Mode app in test mode: ${error}`);
 				throw error;
 			}
 		};
@@ -428,9 +428,9 @@ export class SlackSocketTrigger implements INodeType {
 		if (this.getMode() === 'trigger') {
 			try {
 				await SlackSocketConnectionManager.startSlackSocketConnection(credentials);
-				this.logger.info('Started Slack Socket app in trigger mode');
+				this.logger.info('Started Slack Socket Mode app in trigger mode');
 			} catch (error) {
-				this.logger.error(`Error starting Slack Socket app in trigger mode: ${error}`);
+				this.logger.error(`Error starting Slack Socket Mode app in trigger mode: ${error}`);
 				throw error;
 			}
 		}
