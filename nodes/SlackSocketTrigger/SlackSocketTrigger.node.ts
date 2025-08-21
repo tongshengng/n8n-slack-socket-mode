@@ -63,9 +63,7 @@ const getCachedRegex = (pattern: string): RegExp | null => {
 	}
 };
 
-const cleanupUnusedSlackConnections = async (
-	logger?: Pick<ITriggerFunctions['logger'], 'info' | 'error'>,
-) => {
+const cleanupUnusedSlackConnections = async (onError?: (error: Error) => void) => {
 	const activeBotTokens = new Set(subscribers.map((subscriber) => subscriber.botToken));
 	const activeApps = SlackSocketConnectionManager.getActiveSlackApps();
 
@@ -74,9 +72,7 @@ const cleanupUnusedSlackConnections = async (
 			try {
 				await SlackSocketConnectionManager.stopSlackSocketConnection(slackApp.botToken);
 			} catch (error) {
-				if (logger) {
-					logger.error(`Error stopping unused Slack app: ${error}`);
-				}
+				onError?.(error as Error);
 			}
 		}
 	}
@@ -361,7 +357,9 @@ export class SlackSocketTrigger implements INodeType {
 			});
 		}
 
-		await cleanupUnusedSlackConnections(this.logger);
+		await cleanupUnusedSlackConnections((error) => {
+			this.logger.error(`Error stopping unused Slack app: ${error}`);
+		});
 
 		const manualTriggerFunction = async () => {
 			try {
@@ -387,7 +385,9 @@ export class SlackSocketTrigger implements INodeType {
 			manualTriggerFunction,
 			closeFunction: async () => {
 				subscribers = subscribers.filter((subscriber) => subscriber.nodeId !== this.getNode().id);
-				await cleanupUnusedSlackConnections(this.logger);
+				await cleanupUnusedSlackConnections((error) => {
+					this.logger.error(`Error stopping unused Slack app: ${error}`);
+				});
 			},
 		};
 	}
