@@ -2,7 +2,13 @@
 	"name": "@ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger",
 	"version": "0.1.0",
 	"description": "Experimental Slack socket mode trigger node using simple pubsub pattern.",
-	"keywords": [],
+	"keywords": [
+		"n8n",
+		"n8n-community-node-package",
+		"slack",
+		"socket-mode",
+		"pubsub"
+	],
 	"homepage": "https://github.com/ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger#readme",
 	"bugs": {
 		"url": "https://github.com/ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger/issues"
