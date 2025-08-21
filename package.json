@@ -1,72 +1,67 @@
 {
-  "name": "@mbakgun/n8n-nodes-slack-socket-mode",
-  "version": "1.2.5",
-  "description": "Slack Socket Mode Node for n8n that allows you to use +100 Slack events in your n8n instance with proxy mode",
-  "keywords": [
-    "n8n-community-node-package",
-    "n8n",
-    "n8n-node",
-    "slack",
-    "socket-mode",
-    "slack-bot",
-    "slack-automation",
-    "workflow-automation",
-    "slack-socket-mode"
-  ],
-  "homepage": "https://github.com/mbakgun/n8n-slack-socket-mode#readme",
-  "bugs": {
-    "url": "https://github.com/mbakgun/n8n-slack-socket-mode/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/mbakgun/n8n-slack-socket-mode.git"
-  },
-  "license": "MIT",
-  "author": {
-    "name": "Mehmet Burak Akgün"
-  },
-  "type": "commonjs",
-  "main": "dist/index.js",
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "rm -rf dist && tsc && gulp build:icons",
-    "dev": "tsc --watch",
-    "format": "prettier nodes credentials --write",
-    "lint": "eslint nodes credentials package.json",
-    "lintfix": "eslint nodes credentials package.json --fix",
-    "prepublishOnly": "bun run build && bun run lint -c .eslintrc.prepublish.js nodes credentials package.json"
-  },
-  "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.39.1",
-    "@typescript-eslint/parser": "^8.39.1",
-    "eslint": "^9.33.0",
-    "eslint-plugin-n8n-nodes-base": "^1.16.3",
-    "gulp": "^5.0.1",
-    "jsonc-eslint-parser": "^2.4.0",
-    "prettier": "^3.6.2",
-    "typescript": "^5.9.2"
-  },
-  "peerDependencies": {
-    "n8n-workflow": "^1.17.0"
-  },
-  "engines": {
-    "node": ">=18.10",
-    "bun": ">=1.0.0"
-  },
-  "packageManager": "bun@1.2.13",
-  "n8n": {
-    "n8nNodesApiVersion": 1,
-    "credentials": [
-      "dist/credentials/SlackSocketCredentialsApi.credentials.js"
-    ],
-    "nodes": [
-      "dist/nodes/SlackSocketTrigger/SlackSocketTrigger.node.js"
-    ]
-  },
-  "dependencies": {
-    "@slack/bolt": "^4.4.0",
-    "http-proxy-agent": "^7.0.2"
-  }
+	"name": "@tongsheng.ng/n8n-nodes-slack-socket-mode",
+	"version": "1.0.0",
+	"description": "Slack Socket Mode Node for n8n that allows you to use +100 Slack events in your n8n instance with socket mode",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n",
+		"n8n-node",
+		"slack",
+		"socket-mode",
+		"slack-bot",
+		"slack-automation",
+		"workflow-automation",
+		"slack-socket-mode"
+	],
+	"homepage": "https://github.com/mbakgun/n8n-slack-socket-mode#readme",
+	"bugs": {
+		"url": "https://github.com/mbakgun/n8n-slack-socket-mode/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/mbakgun/n8n-slack-socket-mode.git"
+	},
+	"license": "MIT",
+	"author": {
+		"name": "Mehmet Burak Akgün"
+	},
+	"type": "commonjs",
+	"main": "dist/index.js",
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "rm -rf dist && tsc && cp -r nodes/SlackSocketTrigger/assets dist/nodes/SlackSocketTrigger/ && cp -r credentials/assets dist/credentials/",
+		"dev": "tsc --watch",
+		"format": "biome format --write nodes credentials package.json",
+		"lint": "biome lint nodes credentials package.json",
+		"lintfix": "biome lint --write nodes credentials package.json",
+		"check": "biome check --write nodes credentials package.json",
+		"prepublishOnly": "bun run build && bun run check"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.2.0",
+		"typescript": "^5.9.2"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "^1.17.0"
+	},
+	"engines": {
+		"node": ">=18.10",
+		"bun": ">=1.0.0"
+	},
+	"packageManager": "bun@1.2.13",
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"credentials": [
+			"dist/credentials/SlackSocketModeCredential.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/SlackSocketTrigger/SlackSocketTrigger.node.js"
+		]
+	},
+	"dependencies": {
+		"@slack/bolt": "^4.4.0",
+		"http-proxy-agent": "^7.0.2"
+	}
 }
