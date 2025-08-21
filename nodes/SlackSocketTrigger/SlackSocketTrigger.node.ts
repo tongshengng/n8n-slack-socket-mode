@@ -107,56 +107,7 @@ namespace SlackSocketConnectionManager {
 			botToken: credentials.botToken,
 		});
 
-		// Helper function to check if subscriber should process event
-		const shouldProcessEvent = (
-			subscriber: Subscriber,
-			eventType: string,
-			slackEventData: SlackEventData,
-		): boolean => {
-			// Check if subscriber listens to this event type
-			if (!subscriber.triggerEvents.includes(eventType)) {
-				return false;
-			}
-
-			// Skip bot messages for message events (unless allowed)
-			if (eventType === 'message' && !subscriber.shouldAllowBotMessages) {
-				if (
-					slackEventData.subtype === 'bot_message' ||
-					slackEventData.subtype === 'message_changed'
-				) {
-					return false;
-				}
-			}
-
-			// Check channel filtering
-			if (subscriber.watchedChannelIds.length > 0) {
-				const targetChannelId =
-					eventType === 'reaction_added'
-						? slackEventData.reactionItem?.channel
-						: slackEventData.channel;
-
-				if (!targetChannelId || !subscriber.watchedChannelIds.includes(targetChannelId)) {
-					return false;
-				}
-			}
-
-			// Apply message filter for message events
-			if (eventType === 'message' && subscriber.messageFilterPattern?.trim()) {
-				const messageFilterRegex = getCachedRegex(subscriber.messageFilterPattern);
-				if (!messageFilterRegex) {
-					return false; // Invalid regex pattern
-				}
-
-				const messageText = slackEventData.text || '';
-				if (!messageFilterRegex.test(messageText)) {
-					return false;
-				}
-			}
-
-			return true;
-		};
-
-		// Generic event handler function
+		// Helper function for non-message events
 		const handleSlackEvent = (eventType: string) => {
 			return async ({
 				body,
@@ -173,8 +124,21 @@ namespace SlackSocketConnectionManager {
 
 				try {
 					for (const subscriber of subscribers) {
-						if (!shouldProcessEvent(subscriber, eventType, slackEventData)) {
+						// Check if subscriber listens to this event type
+						if (!subscriber.triggerEvents.includes(eventType)) {
 							continue;
+						}
+
+						// Check channel filtering
+						if (subscriber.watchedChannelIds.length > 0) {
+							const targetChannelId =
+								eventType === 'reaction_added'
+									? slackEventData.reactionItem?.channel
+									: slackEventData.channel;
+
+							if (!targetChannelId || !subscriber.watchedChannelIds.includes(targetChannelId)) {
+								continue;
+							}
 						}
 
 						try {
@@ -195,7 +159,97 @@ namespace SlackSocketConnectionManager {
 		};
 
 		// Register event handlers
-		slackApp.event('message', handleSlackEvent('message'));
+		// Use slackApp.message() for more efficient regex filtering
+		const messageSubscribers = subscribers.filter((sub) => sub.triggerEvents.includes('message'));
+
+		// Group subscribers by their message filter patterns for efficient registration
+		const patternGroups = new Map<string, Subscriber[]>();
+
+		for (const subscriber of messageSubscribers) {
+			const pattern = subscriber.messageFilterPattern?.trim() || '';
+
+			if (!patternGroups.has(pattern)) {
+				patternGroups.set(pattern, []);
+			}
+
+			const group = patternGroups.get(pattern);
+
+			if (group) {
+				group.push(subscriber);
+			}
+		}
+
+		// Helper function to process message events for subscribers
+		const processMessageEvent = async (
+			groupSubscribers: Subscriber[],
+			body: unknown,
+			payload: unknown,
+			context: unknown,
+			event: unknown,
+		) => {
+			const slackEventData = event as unknown as SlackEventData;
+
+			for (const subscriber of groupSubscribers) {
+				// Skip bot messages check
+				if (!subscriber.shouldAllowBotMessages) {
+					if (
+						slackEventData.subtype === 'bot_message' ||
+						slackEventData.subtype === 'message_changed'
+					) {
+						continue;
+					}
+				}
+
+				// Check channel filtering
+				if (subscriber.watchedChannelIds.length > 0) {
+					if (
+						!slackEventData.channel ||
+						!subscriber.watchedChannelIds.includes(slackEventData.channel)
+					) {
+						continue;
+					}
+				}
+
+				try {
+					subscriber.emit({
+						body: body as IDataObject,
+						payload: payload as unknown as IDataObject,
+						context: context as IDataObject,
+						event: event as unknown as IDataObject,
+					});
+				} catch (error) {
+					console.error('Error emitting message event to subscriber:', error);
+				}
+			}
+		};
+
+		// Register message handlers with regex patterns for early filtering
+		for (const [pattern, groupSubscribers] of patternGroups) {
+			if (pattern) {
+				// Use slackApp.message() with regex for efficient filtering
+				const regex = getCachedRegex(pattern);
+
+				if (regex) {
+					slackApp.message(regex, async ({ body, payload, context, event }) => {
+						try {
+							await processMessageEvent(groupSubscribers, body, payload, context, event);
+						} catch (error) {
+							console.error('Error handling Slack message event with regex:', error);
+						}
+					});
+				}
+			} else {
+				// Handle messages without regex filter using generic message handler
+				slackApp.message(async ({ body, payload, context, event }) => {
+					try {
+						await processMessageEvent(groupSubscribers, body, payload, context, event);
+					} catch (error) {
+						console.error('Error handling Slack message event:', error);
+					}
+				});
+			}
+		}
+
 		slackApp.event('app_mention', handleSlackEvent('app_mention'));
 		slackApp.event('reaction_added', handleSlackEvent('reaction_added'));
 

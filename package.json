@@ -1,29 +1,19 @@
 {
-	"name": "@tongsheng.ng/n8n-nodes-slack-socket-mode",
-	"version": "1.0.0",
-	"description": "Slack Socket Mode Node for n8n that allows you to use +100 Slack events in your n8n instance with socket mode",
-	"keywords": [
-		"n8n-community-node-package",
-		"n8n",
-		"n8n-node",
-		"slack",
-		"socket-mode",
-		"slack-bot",
-		"slack-automation",
-		"workflow-automation",
-		"slack-socket-mode"
-	],
-	"homepage": "https://github.com/mbakgun/n8n-slack-socket-mode#readme",
+	"name": "@tongshengng/n8n-nodes-slack-socket-mode-pubsub-trigger",
+	"version": "0.1.0",
+	"description": "Experimental Slack socket mode trigger node using simple pubsub pattern.",
+	"keywords": [],
+	"homepage": "https://github.com/ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger#readme",
 	"bugs": {
-		"url": "https://github.com/mbakgun/n8n-slack-socket-mode/issues"
+		"url": "https://github.com/ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger/issues"
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/mbakgun/n8n-slack-socket-mode.git"
+		"url": "git+https://github.com/ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger.git"
 	},
 	"license": "MIT",
 	"author": {
-		"name": "Mehmet Burak Akgün"
+		"name": "Ng Tong Sheng"
 	},
 	"type": "commonjs",
 	"main": "dist/index.js",
@@ -61,7 +51,6 @@
 		]
 	},
 	"dependencies": {
-		"@slack/bolt": "^4.4.0",
-		"http-proxy-agent": "^7.0.2"
+		"@slack/bolt": "^4.4.0"
 	}
 }
