@@ -1,4 +1,4 @@
-# @mbakgun/n8n-nodes-slack-socket-mode
+# @ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/n8n-io/n8n/master/assets/n8n-logo.png" width="200" alt="n8n logo">
@@ -6,9 +6,15 @@
   <img src="https://cdn.worldvectorlogo.com/logos/slack-new-logo.svg" width="100" alt="Slack logo">
 </div>
 
-This is an n8n community node that lets you use Slack Socket Mode in your n8n workflows. It enables real-time event processing from Slack without requiring public URLs for webhooks.
+This is an n8n community node that enables real-time Slack event processing using Socket Mode with an intelligent publish-subscribe pattern. It allows you to listen to Slack events in real-time without requiring public URLs for webhooks, making it perfect for local development and secure environments.
 
-Since the current integration of Slack in n8n only supports webhooks, this node allows you to use the Slack Socket Mode to listen to events in your Slack workspace in real-time, even in local development environments.
+**Key Features:**
+- 🚀 **Real-time event processing** via Slack Socket Mode
+- 🔄 **Intelligent pub-sub pattern** prevents message loss with multiple connections
+- 🛡️ **No webhook URLs required** - perfect for local development and secure environments
+- ⚡ **Connection pooling** for optimal resource usage
+- 🎯 **Advanced filtering** with regex pattern matching
+- 📱 **Multiple event types** - messages, mentions, reactions, and more
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
@@ -18,179 +24,253 @@ Since the current integration of Slack in n8n only supports webhooks, this node 
 - [Credentials](#credentials)
 - [Node Configuration](#node-configuration)
 - [Supported Events](#supported-events)
+- [Advanced Features](#advanced-features)
 - [Usage Examples](#usage-examples)
-- [Example Workflow](#example-workflow)
+- [Development](#development)
 - [Compatibility](#compatibility)
 - [Resources](#resources)
-- [Version History](#version-history)
+- [License](#license)
 
 ## Installation
 
+### Community Installation
+
 Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
+
+### Manual Installation
 
 Using Bun (recommended):
 ```bash
-bun add @mbakgun/n8n-nodes-slack-socket-mode
+bun add @ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger
 ```
 
 Using npm:
 ```bash
-npm install @mbakgun/n8n-nodes-slack-socket-mode
+npm install @ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger
 ```
 
-After installation, restart n8n and the node will be available in the nodes panel.
+Using pnpm:
+```bash
+pnpm add @ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger
+```
 
-### Development Setup
-
-This project uses [Bun](https://bun.sh) as its package manager. To set up your development environment:
-
-1. Install Bun:
-   ```bash
-   curl -fsSL https://bun.sh/install | bash
-   ```
-   
-2. Install dependencies:
-   ```bash
-   bun install
-   ```
-   
-3. Build the project:
-   ```bash
-   bun run build
-   ```
+After installation, restart n8n and the "Slack Socket Mode Trigger" node will be available in the trigger nodes section.
 
 ## Slack App Setup
 
 Before using this node, you need to create a Slack app with Socket Mode enabled:
 
-1. Go to [https://api.slack.com/apps](https://api.slack.com/apps) and create a new app
-2. Navigate to "Socket Mode" in the left sidebar and enable it
-3. Generate an 'App-Level Token' with the `connections:write` scope
-4. Go to "OAuth & Permissions" and add the following Bot Token Scopes:
-   - `app_mentions:read`
-   - `channels:history`
-   - `channels:read`
-   - `chat:write`
-   - `reactions:read`
-   - `team:read`
-   - (Add any other scopes required for your use case)
-5. Install the app to your workspace (This will generate a 'Bot User OAuth Token')
-6. Copy the Bot User OAuth Token, App-Level Token, and Signing Secret(from the 'Basic Information' section) for credential setup
-7. Go to 'Event Subscriptions' and enable 'Socket Mode'
-8. Subscribe to the events you want to listen to (e.g. `app_mention`, `message`, `reaction_removed`, `reaction_added`)
+1. **Create a Slack App**
+   - Go to [https://api.slack.com/apps](https://api.slack.com/apps)
+   - Click "Create New App" → "From scratch"
+   - Enter your app name and select your workspace
+
+2. **Enable Socket Mode**
+   - Navigate to "Socket Mode" in the left sidebar
+   - Toggle "Enable Socket Mode" to ON
+   - Generate an "App-Level Token" with the `connections:write` scope
+   - Save the token (starts with `xapp-`)
+
+3. **Configure OAuth & Permissions**
+   - Go to "OAuth & Permissions" in the left sidebar
+   - Add the following Bot Token Scopes:
+     - `app_mentions:read` - To receive app mentions
+     - `channels:history` - To read message history
+     - `channels:read` - To access channel information
+     - `chat:write` - To send messages (if needed for responses)
+     - `reactions:read` - To read emoji reactions
+     - `team:read` - To access workspace information
+   - Install the app to your workspace
+   - Copy the "Bot User OAuth Token" (starts with `xoxb-`)
+
+4. **Get Signing Secret**
+   - Go to "Basic Information" in the left sidebar
+   - Copy the "Signing Secret" from the App Credentials section
+
+5. **Configure Event Subscriptions**
+   - Go to "Event Subscriptions" in the left sidebar
+   - Enable "Socket Mode" (should already be enabled)
+   - Subscribe to bot events you want to listen to:
+     - `app_mention` - When your bot is mentioned
+     - `message.channels` - Messages in public channels
+     - `message.groups` - Messages in private channels
+     - `reaction_added` - When reactions are added to messages
 
 ## Credentials
 
-To use this node, you need to set up credentials with the following information:
+Create a new credential of type "Slack Socket Mode Credential" with:
 
-- **Bot Token**: Your Slack Bot User OAuth Token (starts with `xoxb-`)
-- **App-Level Token**: Your Slack App-Level Token for Socket Mode (starts with `xapp-`)
-- **Signing Secret**: Your Slack App Signing Secret
-
-These values can be found in your Slack App configuration.
+- **Signing Secret**: Your Slack App Signing Secret from Basic Information
+- **Bot User OAuth Token**: Your Bot User OAuth Token (starts with `xoxb-`)
+- **App-Level Token**: Your App-Level Token for Socket Mode (starts with `xapp-`)
 
 ## Node Configuration
 
-The Slack Socket Trigger node can be configured with the following options:
+The Slack Socket Mode Trigger node provides the following configuration options:
 
-- **Trigger On**: Select which Slack events should trigger your workflow:
-  - Message: When a message was sent to a channel
-  - App Mention: When the app is mentioned in a message
-  - Reaction Added: When a reaction is added to a message
+### Trigger Events
+- **Message**: Triggers when messages are sent to channels
+- **App Mention**: Triggers when your bot is mentioned (@your_bot_name)
+- **Reaction Added**: Triggers when emoji reactions are added to messages
 
-- **Channels to Watch**: Select specific channels to filter events. If none specified, events from all channels will trigger the workflow.
+### Channel Filtering
+- **Channels to Watch**: Select specific channels to monitor
+- If no channels are selected, all accessible channels will be monitored
+- Supports both public and private channels (based on bot permissions)
 
-- **Message Filter (Optional)**: Optional regex pattern to filter messages. Only messages matching this pattern will trigger the workflow. (Only available for message events)
-
-- **Allow Bot Messages**: Whether to include messages from bots. By default, bot messages and message updates are filtered out. (Only available for message events)
-
-This node supports using an HTTP or HTTPS proxy by reading the following environment variables:
-
-```bash
-export HTTP_PROXY=http://proxy.example.com:3128
-# or
-export HTTPS_PROXY=http://proxy.example.com:3128
-```
+### Message Filtering (Message events only)
+- **Message Filter**: Optional regex pattern to filter messages
+- **Allow Bot Messages**: Include/exclude messages from bots and message updates
+- By default, bot messages and message changes are filtered out
 
 ## Supported Events
 
-The node currently supports the following Slack events:
+### Message Events
+- Triggers on new messages in monitored channels
+- Supports regex pattern matching for content filtering
+- Option to include/exclude bot messages
+- Filters out message updates and changes by default
 
-- **`message`**: When a message is posted to a channel the app is added to
-  - Supports message filtering with regex patterns
-  - Option to include or exclude bot messages
-  - Channel-specific filtering available
+### App Mention Events
+- Triggers when your bot is mentioned in any message
+- Works across all channels where the bot has access
+- Includes the full message context and mention details
 
-- **`app_mention`**: When your bot is mentioned in a channel
-  - Triggers when someone uses @your_bot_name in a message
-  - Channel-specific filtering available
+### Reaction Added Events
+- Triggers when emoji reactions are added to messages
+- Provides reaction details including emoji type and user
+- Works on messages in monitored channels
 
-- **`reaction_added`**: When a reaction (emoji) is added to a message
-  - Triggers for any emoji reaction added to messages
-  - Channel-specific filtering available
+## Advanced Features
+
+### Intelligent Connection Management
+- **Connection Pooling**: Reuses Socket Mode connections across multiple workflow instances
+- **Pub-Sub Pattern**: Prevents message loss when multiple workflows use the same bot token
+- **Automatic Cleanup**: Removes unused connections when workflows are deactivated
+- **Error Handling**: Robust error handling with automatic reconnection
+
+### Why Pub-Sub Pattern?
+When multiple Socket Mode connections are established with the same bot token, Slack distributes events across connections in a round-robin fashion. This means:
+- ❌ **Without pub-sub**: 3 workflows = 3 connections = each receives only ~33% of messages
+- ✅ **With pub-sub**: 3 workflows = 1 shared connection = all workflows receive 100% of messages
+
+The pub-sub pattern ensures **guaranteed message delivery** to all subscribers while optimizing resource usage.
+
+### Performance Optimizations
+- **Regex Caching**: Compiled regex patterns are cached for better performance
+- **Event Filtering**: Early filtering at the Socket Mode level reduces processing overhead
+- **Subscriber Pattern**: Efficient pub-sub pattern for handling multiple workflow triggers
+
+### Channel Management
+- **Dynamic Channel Loading**: Automatically fetches available channels for selection
+- **Permission Awareness**: Only shows channels the bot has access to
+- **Real-time Updates**: Reflects current channel permissions and availability
 
 ## Usage Examples
 
-### Respond to mentions
-
-Configure the node to trigger on `app_mention` events to make your workflow respond when someone mentions your bot.
-
-### Process messages matching a pattern
-
-Use the Regex Pattern field to only trigger on messages that match a specific pattern:
-- Pattern: `help|assist|support`
-- Flags: `i`
-
-This will trigger the workflow only when messages containing "help", "assist", or "support" (case-insensitive) are posted.
-
-### Monitor channel creation
-
-Set the trigger to `channel_created` to run workflows whenever a new channel is created in your workspace.
-
-## Example Workflow
-
-Here's an example of a simple workflow that responds to Slack mentions:
-
+### 1. Auto-Responder Bot
 ```
-[Slack Socket Trigger] → [JSON Parse] → [IF] → [HTTP Request] → [Slack]
+[Slack Socket Mode Trigger] → [Switch] → [Slack]
+```
+- **Trigger**: Message events with regex pattern `help|support`
+- **Switch**: Route based on message content
+- **Slack**: Send appropriate help responses
+
+### 2. Mention Handler
+```
+[Slack Socket Mode Trigger] → [HTTP Request] → [Slack]
+```
+- **Trigger**: App mention events
+- **HTTP Request**: Fetch data from external API
+- **Slack**: Reply with fetched information
+
+### 3. Reaction Monitor
+```
+[Slack Socket Mode Trigger] → [Code] → [Database]
+```
+- **Trigger**: Reaction added events
+- **Code**: Process reaction data
+- **Database**: Store reaction analytics
+
+### 4. Channel-Specific Automation
+```
+[Slack Socket Mode Trigger] → [IF] → [Multiple Actions]
+```
+- **Trigger**: Messages in specific channels only
+- **IF**: Check message content or user
+- **Actions**: Perform different actions based on conditions
+
+## Development
+
+This project uses [Bun](https://bun.sh) as its package manager for improved performance.
+
+### Setup
+```bash
+# Install Bun
+curl -fsSL https://bun.sh/install | bash
+
+# Install dependencies
+bun install
+
+# Build the project
+bun run build
+
+# Development mode with watch
+bun run dev
 ```
 
-1. **Slack Socket Trigger**: Configured to trigger on app mentions
-2. **JSON Parse**: Extracts the message text and channel from the event data
-3. **IF**: Checks if the message contains certain keywords
-4. **HTTP Request**: Fetches relevant data based on the message
-5. **Slack**: Sends a response back to the channel
+### Scripts
+- `bun run build` - Build the project and copy assets
+- `bun run dev` - Development mode with TypeScript watch
+- `bun run format` - Format code with Biome
+- `bun run lint` - Lint code with Biome
+- `bun run check` - Run all checks (format + lint)
 
-This workflow allows you to create a Slack bot that responds to mentions with data from external APIs, all without needing to expose your n8n instance to the internet.
+### Project Structure
+```
+├── credentials/
+│   ├── SlackSocketModeCredential.credentials.ts
+│   └── assets/
+├── nodes/
+│   └── SlackSocketModeTrigger/
+│       ├── SlackSocketModeTrigger.node.ts
+│       └── assets/
+└── package.json
+```
 
 ## Compatibility
 
-- Requires n8n version 1.6.0 or later
-- Tested against n8n versions 1.91.3
-- Uses Bun as package manager for improved performance
+- **n8n**: Requires version 1.17.0 or later
+- **Node.js**: Requires version 18.10 or later
+- **Bun**: Requires version 1.0.0 or later (for development)
+- **Slack API**: Uses @slack/bolt v4.4.0
 
 ## Resources
 
-- [n8n community nodes documentation](https://docs.n8n.io/integrations/community-nodes/)
+- [GitHub Repository](https://github.com/ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger)
+- [n8n Community Nodes Documentation](https://docs.n8n.io/integrations/community-nodes/)
 - [Slack API Documentation](https://api.slack.com/apis)
 - [Slack Socket Mode Documentation](https://api.slack.com/apis/connections/socket)
 - [Slack Events API Documentation](https://api.slack.com/events)
+- [Slack Bolt Framework](https://slack.dev/bolt-js/concepts)
 - [Bun Documentation](https://bun.sh/docs)
 
-## Version History
+## Contributing
 
-- **1.2.0**: Added support for all Slack events
-  - Updated to include all events from the Slack Events API
-  - Improved event descriptions and documentation
-- **1.0.0**: Initial release - Project initialized with Socket Mode support for Slack events
-  - Support for app_mention, message, reaction events
-  - Added button interaction support
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+## Support
+
+If you encounter any issues or have questions:
+1. Check the [GitHub Issues](https://github.com/ngtongsheng/n8n-nodes-slack-socket-mode-pubsub-trigger/issues)
+2. Create a new issue with detailed information about your problem
+3. Include your n8n version, Node.js version, and error messages
 
 ## License
 
 MIT License
 
-Copyright (c) 2025 Mehmet Burak Akgün
+Copyright (c) 2025 Ng Tong Sheng
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
